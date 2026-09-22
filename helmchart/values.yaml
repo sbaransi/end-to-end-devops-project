@@ -1,5 +1,5 @@
 replicas: 2
-image: devops-flask-api
-tag: local
-port: 5000
+image: end-to-end-devops-project
+tag: latest
+port: 5001
 workers: 2

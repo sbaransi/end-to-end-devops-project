@@ -1,14 +1,21 @@
-# Use a lightweight, official Python runtime as a parent image
-FROM python:3.11-slim
+# ===== Builder Stage =====
+FROM python:3.11-slim AS builder
 
-# Set the working directory inside the container
 WORKDIR /app
 
-# Copy the server script into the container
-COPY server.py /app/
+COPY requirements.txt .
 
-# Expose port 8080 to the outside world
-EXPOSE 8080
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
-# Command to run the Python server
-CMD ["python", "server.py"]
+# ===== Runtime Stage =====
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY --from=builder /install /usr/local
+
+COPY app.py .
+
+EXPOSE 5001
+
+CMD ["python", "app.py"]
