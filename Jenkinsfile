@@ -1,31 +1,67 @@
 pipeline {
     agent any
 
+    options {
+        // The Checkout stage below does the checkout
+        skipDefaultCheckout(true)
+    }
+
+    environment {
+        IMAGE_NAME = 'end-to-end-devops-project'
+        IMAGE_TAG  = "${BUILD_NUMBER}"
+    }
+
     stages {
-        stage('Agent Inspection') {
+        stage('Checkout') {
+            steps {
+                checkout scm
+                sh 'git log -1 --oneline'
+            }
+        }
+
+        stage('Install Dependencies') {
             steps {
                 sh '''
-                    echo "===== WHOAMI ====="
-                    whoami || true
-
-                    echo "===== PATH ====="
-                    echo $PATH
-
-                    echo "===== PYTHON ====="
-                    which python || true
-                    which python3 || true
-
-                    echo "===== PIP ====="
-                    which pip || true
-                    which pip3 || true
-
-                    echo "===== DOCKER ====="
-                    which docker || true
-
-                    echo "===== OS ====="
-                    uname -a || true
+                    python3 -m venv .venv
+                    .venv/bin/pip install -r requirements.txt flake8 bandit pytest
                 '''
             }
+        }
+
+        stage('Parallel Checks') {
+            parallel {
+                stage('Linting') {
+                    steps {
+                        sh '.venv/bin/flake8 app.py tests'
+                    }
+                }
+                stage('Security Scan') {
+                    steps {
+                        sh '.venv/bin/bandit -r app.py'
+                    }
+                }
+            }
+        }
+
+        stage('Unit Tests') {
+            steps {
+                sh '.venv/bin/python -m pytest -v'
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                sh 'docker build -t $IMAGE_NAME:$IMAGE_TAG .'
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Pipeline completed successfully!'
+        }
+        failure {
+            echo 'Pipeline failed! Check logs for details.'
         }
     }
 }
