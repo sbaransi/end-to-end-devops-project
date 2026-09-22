@@ -9,6 +9,8 @@ pipeline {
     environment {
         IMAGE_NAME = 'end-to-end-devops-project'
         IMAGE_TAG  = "${BUILD_NUMBER}"
+        // Docker Hub username and access token from Jenkins Credentials
+        DOCKERHUB_CREDS = credentials('dockerhub-creds')
     }
 
     stages {
@@ -54,6 +56,18 @@ pipeline {
                 sh 'docker build -t $IMAGE_NAME:$IMAGE_TAG .'
             }
         }
+
+        stage('Push to Docker Hub') {
+            steps {
+                sh '''
+                    echo "$DOCKERHUB_CREDS_PSW" | docker login -u "$DOCKERHUB_CREDS_USR" --password-stdin
+                    docker tag $IMAGE_NAME:$IMAGE_TAG $DOCKERHUB_CREDS_USR/$IMAGE_NAME:$IMAGE_TAG
+                    docker tag $IMAGE_NAME:$IMAGE_TAG $DOCKERHUB_CREDS_USR/$IMAGE_NAME:latest
+                    docker push $DOCKERHUB_CREDS_USR/$IMAGE_NAME:$IMAGE_TAG
+                    docker push $DOCKERHUB_CREDS_USR/$IMAGE_NAME:latest
+                '''
+            }
+        }
     }
 
     post {
@@ -62,6 +76,11 @@ pipeline {
         }
         failure {
             echo 'Pipeline failed! Check logs for details.'
+        }
+        always {
+            sh 'docker logout || true'
+            // Remove only the local images this build created; the pushed copies stay on Docker Hub
+            sh 'docker rmi $IMAGE_NAME:$IMAGE_TAG $DOCKERHUB_CREDS_USR/$IMAGE_NAME:$IMAGE_TAG $DOCKERHUB_CREDS_USR/$IMAGE_NAME:latest || true'
         }
     }
 }
