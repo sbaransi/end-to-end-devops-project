@@ -1,51 +1,32 @@
 pipeline {
     agent any
 
-    environment {
-        APP_NAME = 'end-to-end-devops-project'
-    }
-
     stages {
-
-        stage('Checkout') {
-            steps {
-                echo 'Source already checked out from GitHub'
-            }
-        }
-
-        stage('Install Dependencies') {
+        stage('Agent Inspection') {
             steps {
                 sh '''
-                    python3 --version
-                    pip3 install -r requirements.txt
+                    echo "===== WHOAMI ====="
+                    whoami || true
+
+                    echo "===== PATH ====="
+                    echo $PATH
+
+                    echo "===== PYTHON ====="
+                    which python || true
+                    which python3 || true
+
+                    echo "===== PIP ====="
+                    which pip || true
+                    which pip3 || true
+
+                    echo "===== DOCKER ====="
+                    which docker || true
+
+                    echo "===== OS ====="
+                    uname -a || true
                 '''
             }
-        }
-
-        stage('Validate Application') {
-            steps {
-                sh '''
-                    python3 -m py_compile app.py
-                '''
-            }
-        }
-
-        stage('Build Docker Image') {
-            steps {
-                sh '''
-                    docker build -t ${APP_NAME}:latest .
-                '''
-            }
-        }
-    }
-
-    post {
-        success {
-            echo 'Pipeline completed successfully'
-        }
-
-        failure {
-            echo 'Pipeline failed'
         }
     }
 }
+`
