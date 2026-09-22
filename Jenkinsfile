@@ -2,46 +2,50 @@ pipeline {
     agent any
 
     environment {
-        APP_NAME = 'devops-flask-api'
+        APP_NAME = 'end-to-end-devops-project'
     }
 
     stages {
-        stage('Initialize & Build') {
+
+        stage('Checkout') {
             steps {
-                echo "Starting build process for ${env.APP_NAME}..."
-                // Build execution steps
+                echo 'Source already checked out from GitHub'
             }
         }
-        
-        stage('Test & Lint Pipeline') {
-            failFast true 
-            parallel {
-                stage('Unit Testing') {
-                    steps {
-                        echo 'Executing pytest suite...'
-                        // Run pytest here
-                    }
-                }
-                stage('Static Code Analysis') {
-                    steps {
-                        echo 'Running flake8 linter and security scans...'
-                        // Run flake8 here
-                    }
-                }
+
+        stage('Install Dependencies') {
+            steps {
+                sh '''
+                    python3 --version
+                    pip3 install -r requirements.txt
+                '''
             }
         }
-        
-        stage('Docker Hub Deployment') {
+
+        stage('Validate Application') {
             steps {
-                echo 'Pushing compiled image to registry...'
-                
-                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                    
-                    sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
-                    sh "docker build -t ${DOCKER_USER}/${env.APP_NAME}:${env.BUILD_NUMBER} ."
-                    sh "docker push ${DOCKER_USER}/${env.APP_NAME}:${env.BUILD_NUMBER}"
-                }
+                sh '''
+                    python3 -m py_compile app.py
+                '''
             }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                sh '''
+                    docker build -t ${APP_NAME}:latest .
+                '''
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Pipeline completed successfully'
+        }
+
+        failure {
+            echo 'Pipeline failed'
         }
     }
 }
