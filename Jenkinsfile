@@ -68,6 +68,23 @@ pipeline {
                 '''
             }
         }
+
+        stage('Update GitOps Repository') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'github-creds', usernameVariable: 'GIT_USER', passwordVariable: 'GIT_TOKEN')]) {
+                    sh '''
+                        git clone https://$GIT_USER:$GIT_TOKEN@github.com/sbaransi/end-to-end-devops-gitops.git gitops
+                        cd gitops
+                        sed -i "s/^tag: .*/tag: '$IMAGE_TAG'/" end-to-end-devops-project/dev/values.yaml
+                        git config user.name "Jenkins CI"
+                        git config user.email "jenkins@localhost"
+                        git add end-to-end-devops-project/dev/values.yaml
+                        git commit -m "Update dev image tag to $IMAGE_TAG"
+                        git push origin main
+                    '''
+                }
+            }
+        }
     }
 
     post {
