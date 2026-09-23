@@ -306,18 +306,17 @@ On a normal network, skip the Kind node step and remove the certificate lines fr
 
 ## Status
 
-Verified:
+Verified on 23 September 2026 with a change to `app.py` ("Version 2" on the home page):
 
-- Jenkins runs every stage: checkout, Flake8 and Bandit in parallel, Pytest, Docker build, Docker Hub push, GitOps update.
+- The change went from `feature/app-version` to `dev`. Jenkins build #5 checked out that `dev` commit.
+- Build #5 ran every stage: Flake8 and Bandit in parallel, Pytest, Docker build, push of `sammybaransi537/end-to-end-devops-project:5`, and the GitOps update.
 - The pushed image can be pulled from Docker Hub, and the repository is public.
-- Jenkins changes only the dev tag. Argo CD rolls out dev on its own, and qa and prd stay unchanged.
+- Jenkins changed only the dev tag. Argo CD rolled out dev on its own with a new ReplicaSet, and all 5 dev pods became Ready.
+- `GET /` in dev returns "Version 2". `GET /health` returned 200 in dev, qa and prd during and after the rollout.
+- qa and prd stayed on tag 2 with the same pods.
 - Argo CD tests: automatic sync, replica change from Git, self-heal after a manual `kubectl scale`, image rollout.
-- `GET /` and `GET /health` return 200 through the Ingress in dev, qa and prd.
 
-Still to do:
-
-- Final run with a change to `app.py`, from a feature branch to a rolled-out dev environment.
-- Pull request from `dev` to `main` in this repository.
+Not done: a prune test (deleting a manifest from Git).
 
 ## Screenshots to add
 
