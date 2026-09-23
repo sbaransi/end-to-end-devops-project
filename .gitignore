@@ -27,3 +27,11 @@ MANIFEST
 # IDEs
 .vscode/
 .idea/
+
+# Pytest cache and local virtual environment
+.pytest_cache/
+.venv/
+
+# Corporate Zscaler certificate (local only, never commit)
+*.pem
+*.crt

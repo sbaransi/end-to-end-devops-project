@@ -1,0 +1,19 @@
+controller:
+  image:
+    registry: docker.io
+    repository: library/jenkins-zscaler
+    tag: "1.0"
+    pullPolicy: Never
+
+# Build agent with Python, Git and the Docker CLI
+agent:
+  image:
+    registry: docker.io
+    repository: library/jenkins-agent-custom
+    tag: "1.0"
+  alwaysPullImage: false
+  # Share the host Docker socket so the agent can run docker build
+  volumes:
+    - type: HostPath
+      hostPath: /var/run/docker.sock
+      mountPath: /var/run/docker.sock
