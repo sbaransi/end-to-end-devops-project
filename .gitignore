@@ -1,36 +1,13 @@
-# Python / Virtual Environments
+# Python
 venv/
+.venv/
 __pycache__/
 *.pyc
-*.pyo
-*.pyd
-.Python
-env/
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
+.pytest_cache/
 
 # IDEs
 .vscode/
 .idea/
-
-# Pytest cache and local virtual environment
-.pytest_cache/
-.venv/
 
 # Corporate Zscaler certificate (local only, never commit)
 *.pem
