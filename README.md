@@ -2,22 +2,23 @@
 
 A small Flask API that goes through a complete local CI/CD and GitOps flow:
 
-Developer push → Jenkins (lint, security scan, tests, Docker build) → Docker Hub → GitOps repository → Argo CD → Kubernetes (Kind) → Service → NGINX Ingress
+Developer push → GitHub Actions (lint, security scan, tests, Docker build) → Docker Hub → GitOps repository → Argo CD → Kubernetes (Kind) → Service → NGINX Ingress
 
 - Code repository (this one): <https://github.com/sbaransi/end-to-end-devops-project>
 - GitOps repository: <https://github.com/sbaransi/end-to-end-devops-gitops>
 - Docker Hub image: <https://hub.docker.com/r/sammybaransi537/end-to-end-devops-project>
 
-Everything runs on one laptop: Windows 11, WSL2 Ubuntu, Docker Desktop and a Kind cluster named `end-to-end-lab`. No cloud services are used.
+The Kubernetes side runs on one laptop: Windows 11, WSL2 Ubuntu, Docker Desktop and a Kind cluster named `end-to-end-lab`.
+CI runs on GitHub Actions (GitHub's servers). Until October 2026 CI ran on Jenkins inside the cluster; that setup is kept below for reference.
 
 ## Architecture
 
 ```mermaid
 flowchart LR
     dev[Developer] -->|git push| code[GitHub: code repo, branch dev]
-    code --> jenkins[Jenkins in Kind]
-    jenkins -->|docker push :BUILD_NUMBER| hub[Docker Hub]
-    jenkins -->|commit new dev tag| gitops[GitHub: GitOps repo, branch main]
+    code --> gha[GitHub Actions]
+    gha -->|docker push :gha-RUN_NUMBER| hub[Docker Hub]
+    gha -->|commit new dev tag| gitops[GitHub: GitOps repo, branch main]
     gitops --> argocd[Argo CD ApplicationSet]
     argocd --> k8s[Kubernetes: dev / qa / prd]
     hub -->|image pull| k8s
@@ -32,10 +33,11 @@ flowchart LR
 | `requirements.txt` | Python packages for the app |
 | `tests/test_app.py` | Pytest tests |
 | `Dockerfile` | Multi-stage image for the app |
-| `Jenkinsfile` | CI/CD pipeline |
+| `.github/workflows/ci.yml` | CI pipeline (GitHub Actions), the active one |
+| `Jenkinsfile` | Previous CI pipeline (Jenkins), kept for reference, no longer used |
 | `helmchart/` | Helm chart for the manual Helm deploy |
-| `jenkins-custom/` | Jenkins controller image and Helm values |
-| `jenkins-agent-custom/` | Jenkins build agent image (Python, Git, Docker CLI) |
+| `jenkins-custom/` | Jenkins controller image and Helm values (previous CI) |
+| `jenkins-agent-custom/` | Jenkins build agent image (previous CI) |
 
 ## The application
 
@@ -64,7 +66,7 @@ curl http://localhost:5001/health
 
 ### Run the checks locally
 
-These are the same checks Jenkins runs:
+These are the same checks GitHub Actions runs:
 
 ```bash
 . .venv/bin/activate
@@ -84,7 +86,47 @@ docker run --rm -p 5001:5001 end-to-end-devops-project:local
 curl http://localhost:5001/health
 ```
 
-## Jenkins pipeline
+## CI pipeline (GitHub Actions)
+
+The pipeline is `.github/workflows/ci.yml`. It runs on GitHub's servers:
+
+- automatically on every push to the `dev` branch,
+- or by hand: **Actions** tab → **CI** → **Run workflow**.
+
+Results: <https://github.com/sbaransi/end-to-end-devops-project/actions>
+
+| Job | What it does |
+|---|---|
+| Linting (Flake8) | Checks the code style. Runs **in parallel** with the security scan |
+| Security Scan (Bandit) | Looks for security problems in `app.py` |
+| Unit Tests (Pytest) | Runs the tests. Starts only when both checks passed |
+| Build and push Docker image | Builds the image and pushes `sammybaransi537/end-to-end-devops-project:gha-<run number>` and `:latest` |
+| Update GitOps repository | Sets `tag:` in `end-to-end-devops-project/dev/values.yaml` of the GitOps repo to `gha-<run number>`, commits as "GitHub Actions" and pushes to `main`. If the tag is already set (a re-run), it skips the commit |
+
+Image tags start with `gha-` so they never clash with the old Jenkins tags (`1`, `2`, ... `8`).
+
+After the last job, Argo CD sees the new tag in the GitOps repository and rolls out the dev environment
+(about 3 minutes, or click **Refresh** in Argo CD). qa and prd are promoted by hand with a pull request in the GitOps repo.
+
+### GitHub Actions secrets
+
+Create these in the code repository: **Settings → Secrets and variables → Actions → New repository secret**. Never put them in Git.
+GitHub hides them in the logs.
+
+| Name | Value |
+|---|---|
+| `DOCKERHUB_USERNAME` | Docker Hub username (`sammybaransi537`) |
+| `DOCKERHUB_TOKEN` | Docker Hub access token with **Read & Write** |
+| `GITOPS_TOKEN` | GitHub token that can **write** to `end-to-end-devops-gitops` (classic token with `repo`) |
+
+Pushing a change to a workflow file from WSL needs a GitHub token with the **`workflow`** scope.
+
+## Previous CI: Jenkins (no longer used)
+
+This section describes how CI ran before GitHub Actions. The `Jenkinsfile` is kept for reference.
+Do not run Jenkins builds any more: Jenkins and GitHub Actions would both change the dev tag.
+
+### Jenkins pipeline stages
 
 | Stage | What it does |
 |---|---|
@@ -180,7 +222,9 @@ helm upgrade --install ingress-nginx ingress-nginx \
 
 `publishService.enabled=false` gives every Ingress an address. Without it the Ingresses have no address and Argo CD shows the apps as Progressing forever.
 
-### 3. Jenkins
+### 3. Jenkins (previous CI, optional)
+
+Only needed to run the old Jenkins pipeline. GitHub Actions does not need anything in the cluster.
 
 Build the two custom images and load them into Kind (each folder needs its local `ZscalerRootCA.pem`):
 
@@ -270,7 +314,7 @@ git switch -c feature/my-change
 git push -u origin feature/my-change
 git switch dev
 git merge --no-ff feature/my-change
-git push origin dev            # then click Build Now in Jenkins
+git push origin dev            # GitHub Actions starts by itself
 ```
 
 When dev works, open a pull request from `dev` to `main` on GitHub and merge it.
@@ -300,13 +344,24 @@ On a normal network, skip the Kind node step and remove the certificate lines fr
 | ApplicationSet CRD error `metadata.annotations: Too long` | Install Argo CD with `kubectl apply --server-side` |
 | `docker: command not found` in the Jenkins agent | On Debian 13 install `docker-cli`, not `docker.io` |
 | `permission denied` on `/var/run/docker.sock` in Jenkins | The agent user must be in the socket's group (id 1001 here) |
-| GitOps push fails with 403 | The GitHub token needs **Contents: Read and write** on the GitOps repository |
+| GitOps push fails with 403 | The token in `GITOPS_TOKEN` can read but not write. Use a token with write access to the GitOps repository |
+| `refusing to allow a Personal Access Token to create or update workflow` | The token used by `git push` in WSL needs the **`workflow`** scope |
+| Re-run of all jobs fails with `nothing to commit` | Fixed: the workflow now skips the commit when the tag is already set |
+| Argo CD: `TLS handshake timeout` to github.com | The cluster lost its network (often after sleep). Retry, or restart `argocd-repo-server`; if needed `wsl --shutdown` and restart Docker Desktop |
 | Argo CD does not react to a Git change right away | It checks Git about every 3 minutes (no webhook) |
 | `legacy builder is deprecated` in the build log | Harmless. The agent has no BuildKit, which this course does not use |
 
 ## Status
 
-Verified on 23 September 2026 with a change to `app.py` ("Version 2" on the home page):
+Verified on 17 October 2026 with GitHub Actions:
+
+- The workflow was added on `feature/github-actions` and merged into `dev`. The push to `dev` started the pipeline.
+- Run 2 passed all jobs: Flake8 and Bandit in parallel, Pytest, Docker build and push of `:gha-2`, and the GitOps update.
+- The GitOps repository got the commit "Update dev image tag to gha-2" by GitHub Actions.
+- Argo CD rolled out dev: all 5 pods run `sammybaransi537/end-to-end-devops-project:gha-2`, and `GET /health` returns 200.
+- qa and prd stayed on tag 2.
+
+Earlier, with Jenkins (23 September 2026), with a change to `app.py` ("Version 2" on the home page):
 
 - The change went from `feature/app-version` to `dev`. Jenkins build #5 checked out that `dev` commit.
 - Build #5 ran every stage: Flake8 and Bandit in parallel, Pytest, Docker build, push of `sammybaransi537/end-to-end-devops-project:5`, and the GitOps update.
@@ -320,10 +375,10 @@ Not done: a prune test (deleting a manifest from Git).
 
 ## Screenshots to add
 
-- Jenkins: stage view of a successful build
-- Jenkins: build log with the tokens shown as `****`
+- GitHub Actions: run graph with all 5 jobs green
+- GitHub Actions: secrets page (names only, values are hidden)
 - Docker Hub: repository tags page
-- GitHub: GitOps commit "Update dev image tag to N" by Jenkins CI
+- GitHub: GitOps commit "Update dev image tag to gha-N" by GitHub Actions
 - Argo CD: the three applications Synced and Healthy
 - Terminal: `kubectl get deploy,pods,svc,endpoints,ingress -n dev`
 - Browser: <http://dev.devops.local:8080/health>
