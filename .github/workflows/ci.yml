@@ -90,6 +90,10 @@ jobs:
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
           git add end-to-end-devops-project/dev/values.yaml
+          if git diff --cached --quiet; then
+            echo "dev already uses ${IMAGE_TAG} - nothing to update"
+            exit 0
+          fi
           git commit -m "Update dev image tag to ${IMAGE_TAG}"
           git pull --rebase origin main
           git push origin main
