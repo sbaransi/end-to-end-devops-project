@@ -36,6 +36,7 @@ flowchart LR
 | `.github/workflows/ci.yml` | CI pipeline (GitHub Actions), the active one |
 | `Jenkinsfile` | Previous CI pipeline (Jenkins), kept for reference, no longer used |
 | `helmchart/` | Helm chart for the manual Helm deploy |
+| `terraform/` | Terraform for the AWS EC2 `builder` instance (SSH key, security group, Docker via user-data). See [terraform/README.md](terraform/README.md) |
 | `jenkins-custom/` | Jenkins controller image and Helm values (previous CI) |
 | `jenkins-agent-custom/` | Jenkins build agent image (previous CI) |
 
