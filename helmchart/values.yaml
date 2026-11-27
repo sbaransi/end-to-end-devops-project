@@ -1,5 +1,9 @@
 replicas: 2
-image: end-to-end-devops-project
+image: sammybaransi537/end-to-end-devops-project
 tag: latest
 port: 5001
 workers: 2
+
+ingress:
+  className: nginx
+  host: devops.local
