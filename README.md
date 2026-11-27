@@ -276,13 +276,15 @@ The environments are described in the [GitOps repository README](https://github.
 
 ## Manual Helm deploy (Helm exercise)
 
-`helmchart/` deploys one copy of the app to the `default` namespace on host `devops.local`. It uses a locally built image loaded into Kind. The dev, qa and prd environments use the Docker Hub image through GitOps instead.
+`helmchart/` deploys one copy of the app to the `default` namespace.
+The image comes from Docker Hub (`sammybaransi537/end-to-end-devops-project:latest`, pushed by GitHub Actions).
+Resource names come from the release name (`flask-app-deploy`, `flask-app-svc` ...), and the ingress class and host
+come from `values.yaml` (`ingress.className`, `ingress.host`).
 
 ```bash
-docker build -t end-to-end-devops-project:latest .
-kind load docker-image end-to-end-devops-project:latest --name end-to-end-lab
 helm lint ./helmchart
 helm upgrade --install flask-app ./helmchart
+kubectl get deploy,svc,ingress -n default
 curl -H "Host: devops.local" http://127.0.0.1:8080/health
 ```
 
