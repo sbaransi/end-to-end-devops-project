@@ -3,9 +3,9 @@ kind: Ingress
 metadata:
   name: {{ .Release.Name }}-ingress
 spec:
-  ingressClassName: nginx
+  ingressClassName: {{ .Values.ingress.className }}
   rules:
-  - host: devops.local
+  - host: {{ .Values.ingress.host }}
     http:
       paths:
       - path: /
@@ -14,4 +14,4 @@ spec:
           service:
             name: {{ .Release.Name }}-svc
             port:
-              number: 5001
+              number: {{ .Values.port }}
