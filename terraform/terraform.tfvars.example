@@ -1,0 +1,9 @@
+# Copy to terraform.tfvars only if you need to change a default.
+# terraform.tfvars is ignored by Git.
+
+# College lab account (exam VPC):
+# vpc_id    = "vpc-044604d0bfb707142"
+# subnet_id = "subnet-xxxxxxxx"   # a public subnet of that VPC
+
+# instance_type = "t3.micro"
+# allowed_cidr  = "203.0.113.10/32"
